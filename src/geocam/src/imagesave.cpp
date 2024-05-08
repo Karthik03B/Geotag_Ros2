@@ -1,5 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <std_msgs/msg/int32.hpp>
 #include <opencv2/opencv.hpp>
 #include "cv_bridge/cv_bridge.h"
@@ -13,11 +14,14 @@ public:
     ImageSubscriber() : Node("image_subscriber"), save(false) {
         subscription1_ = this->create_subscription<sensor_msgs::msg::Image>(
             "/camera/image_raw", 10, std::bind(&ImageSubscriber::imageCallback1, this, std::placeholders::_1));
+        
+        navsat_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
+            "/ap/navsat/navsat0", 10, std::bind(&ImageSubscriber::navsatCallback, this, std::placeholders::_1));
 
         subscription2_ = this->create_subscription<std_msgs::msg::Int32>(
             "trigger/value", 10, std::bind(&ImageSubscriber::imageCallback2, this, std::placeholders::_1));
-        images_path_ = "/home/karthikeya/Pictures/images2/";
-        images_meta_ = "/home/karthikeya/Pictures/images2/meta.txt";
+        images_path_ = "/home/linux/geotag_images/";
+        images_meta_ = "/home/linux/geotag_images/meta.txt";
         count = Imagecount();
     }
 
@@ -47,6 +51,9 @@ private:
 
         std::ofstream meta_file(images_meta_, std::ios::app);
         meta_file << "image_"<< "-" << std::to_string(count) << ".jpg," << get_timestamp() << std::endl;
+        meta_file << "Altitude: " << altitude_ << "meters" << std::endl;
+        meta_file << "Latitude: " << latitude_ << "degrees" << std::endl;
+        meta_file << "Longitude: " << longitude_ << std::endl;
         count++;
          meta_file.close();
        
@@ -63,6 +70,12 @@ private:
             save = false;
         }
     }
+    
+    void navsatCallback(const sensor_msgs::msg::NavSatFix::SharedPtr msg) {
+        altitude_ = msg->altitude;
+        latitude_ = msg->latitude;
+        longitude_ = msg->longitude;
+     }
      std::string get_timestamp()
     {
         auto now = std::chrono::system_clock::now();
@@ -73,11 +86,15 @@ private:
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription1_;
+    rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr navsat_sub_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr subscription2_;
     bool save;
     std::string images_path_;
     std::string images_meta_;
     int count;
+    double altitude_;
+    double latitude_;
+    double longitude_;
 
 };
 
